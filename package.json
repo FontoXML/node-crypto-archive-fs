@@ -1,0 +1,19 @@
+{
+  "name": "crypto-archive-fs",
+  "version": "0.1.0",
+  "description": "(Almost) transparently read from encrypted archives using the standard fs API.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "fs",
+    "crypto"
+  ],
+  "author": "Stef Busking <stef.busking@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.4.7",
+    "stream-buffers": "^3.0.0"
+  }
+}
