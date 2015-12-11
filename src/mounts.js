@@ -7,7 +7,7 @@ const path = require('path');
 
 const createFsApi = require('./createFsApi');
 
-const archivesByPath = {};
+const archiveFsApiByPath = {};
 
 module.exports = {
 	mount (archivePath, cryptoAlgorithm, cryptoPassword) {
@@ -19,20 +19,22 @@ module.exports = {
 			buffer = Buffer.concat([decipher.update(buffer), decipher.final()]);
 		}
 
-		archivesByPath[archivePath] = createFsApi(archivePath, new AdmZip(buffer));
+		archiveFsApiByPath[archivePath] = createFsApi(archivePath, new AdmZip(buffer));
 	},
 
 	getArchive (fileOrDirectoryPath) {
-		const matchingArchivePath = Object.keys(archivesByPath)
+		fileOrDirectoryPath = path.resolve(fileOrDirectoryPath);
+		const matchingArchivePath = Object.keys(archiveFsApiByPath)
 			// TODO: prevent matching filename substrings
-			.find((archivePath) => fileOrDirectoryPath.indexOf(archivePath) === 0);
+			.find((archivePath) => fileOrDirectoryPath.startsWith(archivePath));
+
 		if (!matchingArchivePath) {
 			return null;
 		}
 
 		return {
 			archivePath: matchingArchivePath,
-			fs: archivesByPath[matchingArchivePath]
+			fs: archiveFsApiByPath[matchingArchivePath]
 		};
 	}
 };

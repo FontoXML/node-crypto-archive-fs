@@ -4,6 +4,19 @@ const fs = require('fs');
 const path = require('path');
 const streamBuffers = require('stream-buffers');
 
+function stubAsync (fsApi, syncMethodName, cb) {
+	const args = Array.from(arguments).slice(3);
+	let result;
+	try {
+		result = fsApi[syncMethodName].apply(fsApi, args);
+	}
+	catch (err) {
+		cb(err);
+	}
+
+	cb(null, result);
+}
+
 class FsApi {
 	constructor (archivePath, zipFile) {
 		this._archivePath = archivePath;
@@ -35,28 +48,36 @@ class FsApi {
 		}
 	}
 
+	lstat (file, cb) {
+		stubAsync(this, 'lstatSync', cb, file);
+	}
+
 	lstatSync (file) {
 		return this.statSync(file);
 	}
 
+	mkdir (file, cb) {
+		cb(new Error('Archive is read-only'));
+	}
+
 	readdir (file, cb) {
-		try {
-			cb(null, this.readdirSync(file));
-		}
-		catch (err) {
-			cb(err);
-		}
+		stubAsync(this, 'readdirSync', cb, file);
 	}
 
 	readdirSync (file) {
 		const relativePath = path.relative(this._archivePath, file);
-		const entries = this._zipFile.getEntries()
-			.map((entry) => '/' + entry.entryName)
-			.filter((entryName) => (entryName.indexOf(relativePath + '/') === 0) &&
-				entryName.indexOf('/', relativePath.length + 1) === -1)
-			.map((entryName) => entryName.slice(relativePath.length + 1));
+		const allEntryNames = this._zipFile.getEntries()
+			.map((entry) => '/' + entry.entryName);
 
-		return entries;
+		const childPathsRelativeToDir = allEntryNames
+			.filter((entryName) => entryName.indexOf(relativePath + '/') === 0)
+			.map((entryName) => path.relative(relativePath, '.' + entryName));
+
+		const childItemNames = childPathsRelativeToDir
+			.filter((entryName) => !(/\/.+/).test(entryName))
+			.map((entryName) => path.normalize(entryName));
+
+		return childItemNames;
 	}
 
 	readFileSync (file, options) {
@@ -71,23 +92,39 @@ class FsApi {
 		return buffer;
 	}
 
+	realpathSync (file) {
+		const relativePath = path.relative(this._archivePath, file);
+		return path.resolve(fs.realpathSync(this._archivePath), relativePath);
+	}
+
+	stat (file, cb) {
+		stubAsync(this, 'statSync', cb, file);
+	}
+
 	statSync (file) {
 		const zipFileStat = fs.statSync(this._archivePath);
 		const relativePath = path.relative(this._archivePath, file);
 
-		if (!relativePath) {
+		function createFakeStat (isDirectory, size) {
 			return Object.assign({}, zipFileStat, {
 				isDirectory () {
-					return true;
+					return isDirectory;
 				},
 				isFile () {
+					return !isDirectory;
+				},
+				isSymbolicLink () {
 					return false;
 				},
-				size: 0
+				size
 			});
 		}
 
-		const entry = this._zipFile.getEntry(relativePath);
+		if (!relativePath) {
+			return createFakeStat(true, 0);
+		}
+
+		const entry = this._zipFile.getEntry(relativePath) || this._zipFile.getEntry(relativePath + '/');
 		if (!entry) {
 			throw new Error('ENOENT');
 		}
@@ -98,24 +135,7 @@ class FsApi {
 			size = this._zipFile.readFile(relativePath).length;
 		}
 
-		return Object.assign({}, zipFileStat, {
-			isDirectory () {
-				return isDirectory;
-			},
-			isFile () {
-				return !isDirectory;
-			},
-			size
-		});
-	}
-
-	stat (file, cb) {
-		try {
-			cb(null, this.statSync(file));
-		}
-		catch (err) {
-			cb(err);
-		}
+		return createFakeStat(isDirectory, size);
 	}
 
 	unlinkSync () {

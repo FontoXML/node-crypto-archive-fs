@@ -22,7 +22,6 @@ function createProxy (methodName) {
 		const args = Array.from(arguments);
 		const archive = mounts.getArchive(file);
 		if (!archive) {
-			console.log(`${methodName}(${args.map((a) => JSON.stringify(a)).join(', ')})`);
 			return fs[methodName].apply(this, args);
 		}
 
@@ -34,12 +33,15 @@ function createProxy (methodName) {
 const api = {
 	createReadStream: createProxy('createReadStream'),
 	existsSync: createProxy('existsSync'),
+	lstat: createProxy('lstat'),
 	lstatSync: createProxy('lstatSync'),
+	mkdir: createProxy('mkdir'),
 	readdir: createProxy('readdir'),
 	readdirSync: createProxy('readdirSync'),
 	readFileSync: createProxy('readFileSync'),
-	statSync: createProxy('statSync'),
+	realpathSync: createProxy('realpathSync'),
 	stat: createProxy('stat'),
+	statSync: createProxy('statSync'),
 	unlinkSync: createProxy('unlinkSync'),
 	writeFileSync: createProxy('writeFileSync'),
 
